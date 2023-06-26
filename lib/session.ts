@@ -15,19 +15,44 @@ export const authOptions: NextAuthOptions = {
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         })
     ],
-    // jwt: {
-    //     encode: ({ secret, token }) => {
+    jwt: {
+        encode: ({ secret, token }) => {
+            const encodedToken = jsonwebtoken.sign({
+                ...token,
+                iss: 'grafbase',
+                exp: Math.floor(Date.now() / 1000) + 60 * 60
+            }, secret)
+            return encodedToken;
+        },
+        decode: async ({ secret, token }) => {
+            const decodedToken = jsonwebtoken.verify(token!, secret) as JWT;
 
-    //     },
-    //     decode: async ({ secret, token }) => {}
-    // },
+            return decodedToken;
+        }
+    },
     theme: {
         colorScheme: 'dark',
         logo: '/logo.png'
     },
     callbacks: {
         async session({session}) {
-            return session;
+            const email = session?.user?.email as string;
+            try{
+                const data = await getUser(email) as {user?: UserProfile}
+
+                const newSession = {
+                    ...session,
+                    user: {
+                        ...session.user,
+                        ...data?.user
+                    }
+                }
+                return newSession;
+            }catch(error){
+                console.log('Error retrieving user data');
+                return session
+            }
+            
         },
         async signIn({user} : {user: AdapterUser | User }) {
             try {
